@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>语音命令控制 Demo</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      padding: 20px;
+      text-align: center;
+      transition: background-color 0.3s;
+    }
+    button {
+      font-size: 20px;
+      padding: 10px 20px;
+    }
+    #message {
+      font-size: 18px;
+      margin-top: 30px;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>🎤 语音命令控制 Demo / Voice Command Demo</h1>
+  <button id="langSwitch">切换语言 Language Switch</button>
+  <button id="startBtn">点击开始说话 Click to Speak</button>
+  <p>你说的是/Log：<span id="result">...</span></p>
+  <div id="message"></div>
+
+  <button id="toggleHelpBtn" style="margin-top: 40px;">📋 帮助/Help</button>
+
+<div id="helpSection" style="display:none; margin-top: 20px; font-size: 16px; text-align: left;">
+  <h3>🗒️ 可用命令列表 / Available Commands</h3>
+  <ul id="commandList"></ul>
+    <p style="color: gray;">提示：可以点击“切换语言”按钮在中英文之间切换。</p>
+    <p style="color: gray;">Note: You can click the "Language Switch" button to switch between Chinese and English.</p>
+</div>
+
+  <script src="script.js"></script>
+
+</body>
+</html>

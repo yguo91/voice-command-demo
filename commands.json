@@ -1,0 +1,34 @@
+[
+    {
+      "trigger": ["变成蓝色", "blue background", "change background to blue"],
+      "action": "changeBackground",
+      "params": { "color": "#cce5ff" },
+      "reply": {
+        "zh-CN": "背景已变成蓝色",
+        "en-US": "Background changed to blue"
+      }
+    },
+    {
+        "trigger": ["显示欢迎", "打招呼", "show welcome", "say hello"],
+        "action": "showMessage",
+        "params": {
+            "text": {
+                "zh-CN": "你好，欢迎回来！",
+                "en-US": "Hi there, welcome back!"}
+        },
+        "reply": {
+            "zh-CN": "你好，欢迎回来！",
+            "en-US": "Hello, welcome back!"
+        }
+    },
+    {
+      "trigger": ["重置", "reset"],
+      "action": "reset",
+      "params": {},
+      "reply": {
+        "zh-CN": "已恢复默认状态",
+        "en-US": "Reset to default"
+      }
+    }
+  ]
+  
