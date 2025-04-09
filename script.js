@@ -4,15 +4,16 @@ if (!SpeechRecognition) {
   alert("你的浏览器不支持 SpeechRecognition，请使用 Chrome"+"Your browser doesn't support SpeechRecognition. Please use Chrome.");
 }
 
-const resultSpan = document.getElementById('result')
-// const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
-// recognition.lang = 'zh-CN'; // 默认中文，可切换为 'en-US'
-// recognition.interimResults = false;
+const resultSpan = document.getElementById('result');
+const statusSpan = document.getElementById('status');
+
+// global variables
 let currentLang = 'zh-CN'; // 默认中文，可切换为 'en-US'
 let commands = [];
 let voices = [];
 let isAwake = false;
 let wakeWords = [];
+let conversationTimeout; // 用于设置对话超时
 
 // 🔄 Load available voices for speech synthesis
 window.speechSynthesis.onvoiceschanged = () => {
@@ -27,46 +28,87 @@ wakeRecognition.lang = 'en-US';
 
 wakeRecognition.onresult = (event) => {
   const text = event.results[event.results.length - 1][0].transcript.trim().toLowerCase();
-  console.log("Wake heard:", text);
-  if (wakeWords.some(word => text.includes(word))) {
+  // console.log("Wake heard:", text);
+  const wakePattern = new RegExp(`\\b(${wakeWords.join('|')})\\b`, 'i');
+  
+  if (wakePattern.test(text)) {
     isAwake = true;
-    speak("I'm listening...");
-    recognition.start();
+    updateStatus("🟢 Awake");
+    resetConversationTimeout();
+    
+    speak(currentLang === 'zh-CN' ? "请说" : "Please speak").then(() => {
+      wakeRecognition.stop();
+      recognition.start();
+    });
   }
 };
 
 wakeRecognition.onerror = (e) => {
   console.warn("Wake error:", e.error);
-  wakeRecognition.stop();
-  setTimeout(() => wakeRecognition.start(), 1000);
+  if (e.error === 'not-allowed') {
+    speak(currentLang === 'zh-CN' ? "需要麦克风权限" : "Microphone access required");
+  }
+  setTimeout(() => wakeRecognition.start(), 2000);
 };
 
 wakeRecognition.onend = () => {
-  if (!isAwake) setTimeout(() => wakeRecognition.start(), 500);
+  if (!isAwake) {
+    updateStatus("💤 Sleep");
+    setTimeout(() => wakeRecognition.start(), 500);
+  }
 };
-
-window.onload = () => wakeRecognition.start();
 
 // 🎙️ Main recognizer for actual commands
 const recognition = new SpeechRecognition();
 recognition.lang = currentLang;
 recognition.interimResults = false;
 
+recognition.onresult = (event) => {
+  clearTimeout(conversationTimeout);
+  const text = event.results[0][0].transcript.trim();
+  resultSpan.textContent = text;
+  matchCommand(text);
+  resetConversationTimeout();
+};
+
+recognition.onend = () => {
+  if (isAwake) {
+    speak(currentLang === 'zh-CN' ? "等待下一个指令" : "Waiting for next command").then(() => {
+      isAwake = false;
+      updateStatus("💤 Sleep");
+      wakeRecognition.start();
+    });
+  }
+};
+
 recognition.onerror = (event) => {
   console.warn('Recognition error:', event.error);
+  resultSpan.textContent = '识别出错/Error: ' + event.error;
+  if (event.error === 'no-speech') {
+    speak(currentLang === 'zh-CN' ? "没有检测到语音" : "No speech detected");
+  }
+  isAwake = false;
+  wakeRecognition.start();
 };
 
 // 🌐 Load commands.json
 fetch('commands.json')
-  .then(res => res.json())
+  .then(res => {
+    if (!res.ok) throw new Error('Network error');
+    return res.json();
+  })
   .then(data => {
     commands = data;
     populateCommandList();
     const wakeItem = commands.find(cmd => cmd.action === 'wake');
     if (wakeItem) wakeWords = wakeItem.trigger.map(t => t.toLowerCase());
-  });
+  })
+  .catch(err => {
+    console.error('无法加载命令列表:', err);
+    speak(currentLang === 'zh-CN' ? "命令列表加载失败" : "Failed to load commands");
+});
 
-// 📌 UI Event Listeners
+// 📌 Manual control buttons
 document.getElementById('langSwitch').onclick = () => {
   currentLang = currentLang === 'zh-CN' ? 'en-US' : 'zh-CN';
   recognition.lang = currentLang;
@@ -74,19 +116,28 @@ document.getElementById('langSwitch').onclick = () => {
 };
 
 document.getElementById('startBtn').onclick = () => {
+  if (wakeRecognition) wakeRecognition.stop();
+  // wakeRecognition.continuous = false; // Stop continuous listening
+  updateStatus("🟢 Awake (manual)");
   recognition.start();
-};
-
-recognition.onresult = (event) => {
-  const text = event.results[0][0].transcript.trim();
-  document.getElementById('result').textContent = text;
-  matchCommand(text);
 };
 
 document.getElementById('toggleHelpBtn').onclick = () => {
   const section = document.getElementById('helpSection');
   section.style.display = section.style.display === 'none' ? 'block' : 'none';
 };
+
+// 🛠️ 功能函数
+// resetConversationTimeout
+function resetConversationTimeout() {
+  clearTimeout(conversationTimeout);
+  conversationTimeout = setTimeout(() => {
+    if (isAwake) {
+      speak(currentLang === 'zh-CN' ? "您还在吗？" : "Are you still there?");
+      resetConversationTimeout();
+    }
+  }, 10000);
+}
 
 // 📜 Populate command list
 function populateCommandList() {
@@ -104,18 +155,33 @@ function populateCommandList() {
   });
 }
 
+function updateStatus(text) {
+  statusSpan.textContent = text;
+}
+
 // 🔎 Command Matching
 function matchCommand(input) {
   const lower = input.toLowerCase();
+  let matched = false;
 
   for (let cmd of commands) {
-    if (cmd.trigger.some(t => lower.includes(t))) {
+    const patterns = cmd.trigger.map(t => 
+      new RegExp(`\\b${t.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')}\\b`, 'i')
+    );
+    
+    if (patterns.some(p => p.test(lower))) {
       runAction(cmd);
-      return;
+      matched = true;
+      break;
     }
   }
-  //speak("我还听不懂这个命令哦");
-  speak(input); // 重复朗读识别的文本
+
+  if (!matched && isAwake) {
+    const response = currentLang === 'zh-CN' 
+      ? `没有找到「${input}」相关指令` 
+      : `No command found for "${input}"`;
+    speak(response);
+  }
 }
 
 function runAction(cmd) {
@@ -137,6 +203,12 @@ function runAction(cmd) {
       document.body.style.backgroundColor = "white";
       document.getElementById("message").innerText = "";
       break;
+
+    case "sleep":
+      isAwake = false;
+      recognition.stop();
+      wakeRecognition.start();
+      break;
   }
   // 其他动作可以在这里添加
   speak(reply || "命令已执行");
@@ -144,15 +216,18 @@ function runAction(cmd) {
 
 // 🔊 Speak function
 function speak(text) {
-  const msg = new SpeechSynthesisUtterance(text);
-  msg.lang = currentLang;
-  const selectedVoice = voices.find(v => v.lang === currentLang);
-  if (selectedVoice) msg.voice = selectedVoice;
-  window.speechSynthesis.speak(msg);
+  return new Promise(resolve => {
+    const msg = new SpeechSynthesisUtterance(text);
+    msg.lang = currentLang;
+    const selectedVoice = voices.find(v => v.lang === currentLang);
+    if (selectedVoice) msg.voice = selectedVoice;
+    msg.onend = resolve;
+    window.speechSynthesis.speak(msg);
+  });
 }
 
-
-recognition.onerror = (event) => {
-  resultSpan.textContent = '识别出错/Error: ' + event.error;
+// 🚀 Start system
+window.onload = () => {
+  updateStatus("💤 Sleep");
+  wakeRecognition.start();
 };
-

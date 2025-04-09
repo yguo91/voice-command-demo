@@ -8,6 +8,14 @@
     }
   },
   {
+    "trigger": ["停止", "结束对话", "goodbye", "stop listening"],
+    "action": "sleep",
+    "reply": {
+      "zh-CN": "对话已结束",
+      "en-US": "Ending conversation"
+    }
+  },
+  {
     "trigger": ["变成红色", "red background", "change background to red"],
     "action": "changeBackground",
     "params": { "color": "#f8d7da" },
