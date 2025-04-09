@@ -1,6 +1,6 @@
 [
   {
-    "trigger": ["hi bob", "hey bob", "hello bob"],
+    "trigger": ["小宝小宝", "hi bob", "hey bob", "hello bob"],
     "action": "wake",
     "reply": {
       "en-US": "I'm listening",

@@ -24,20 +24,25 @@ window.speechSynthesis.onvoiceschanged = () => {
 const wakeRecognition = new SpeechRecognition();
 wakeRecognition.continuous = true;
 wakeRecognition.interimResults = false;
-wakeRecognition.lang = 'en-US';
+wakeRecognition.lang = 'zh-CN'; // 语言设置为中文
 
 wakeRecognition.onresult = (event) => {
   const text = event.results[event.results.length - 1][0].transcript.trim().toLowerCase();
-  // console.log("Wake heard:", text);
-  const wakePattern = new RegExp(`\\b(${wakeWords.join('|')})\\b`, 'i');
+  console.log("[DEBUG] Wake heard:", text);
+
+  // Check if the recognized text matches any of the wake words
+  const escapedWords = wakeWords.map(w => w.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&'));
+  const wakePattern = new RegExp(`(${escapedWords.join('|')})`, 'i');
   
   if (wakePattern.test(text)) {
+    console.log("[DEBUG] Wake word successfully recognized");
     isAwake = true;
     updateStatus("🟢 Awake");
     resetConversationTimeout();
     
+    wakeRecognition.stop();
     speak(currentLang === 'zh-CN' ? "请说" : "Please speak").then(() => {
-      wakeRecognition.stop();
+      recognition.lang = currentLang; // 动态设置主识别器语言
       recognition.start();
     });
   }
@@ -60,7 +65,7 @@ wakeRecognition.onend = () => {
 
 // 🎙️ Main recognizer for actual commands
 const recognition = new SpeechRecognition();
-recognition.lang = currentLang;
+// recognition.lang = currentLang;
 recognition.interimResults = false;
 
 recognition.onresult = (event) => {
@@ -165,9 +170,10 @@ function matchCommand(input) {
   let matched = false;
 
   for (let cmd of commands) {
-    const patterns = cmd.trigger.map(t => 
-      new RegExp(`\\b${t.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')}\\b`, 'i')
-    );
+    const patterns = cmd.trigger.map(t => {
+      const escaped = t.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+      return new RegExp(escaped, 'i');
+    });
     
     if (patterns.some(p => p.test(lower))) {
       runAction(cmd);
@@ -221,7 +227,10 @@ function speak(text) {
     msg.lang = currentLang;
     const selectedVoice = voices.find(v => v.lang === currentLang);
     if (selectedVoice) msg.voice = selectedVoice;
-    msg.onend = resolve;
+    msg.onend = () => {
+      // console.log("[DEBUG] 语音合成完成");
+      resolve();
+    };
     window.speechSynthesis.speak(msg);
   });
 }
