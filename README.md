@@ -27,6 +27,8 @@ Command definitions and spoken replies are managed externally via `commands.json
 - 📋 Expandable command list with toggle
 - 💡 No backend required — runs in browser
 
+- 🚧Underworking feature: add "wake word" to active input. The feature is avilable, but unsteady (April 9, 2025). Best under "live server" mode to run.
+
 ---
 
 ## 🚀 How to Run
