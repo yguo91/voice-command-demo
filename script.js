@@ -65,8 +65,11 @@ wakeRecognition.onend = () => {
 
 // 🎙️ Main recognizer for actual commands
 const recognition = new SpeechRecognition();
-// recognition.lang = currentLang;
-recognition.interimResults = false;
+// 关键配置项
+recognition.continuous = false;    // 单次识别模式（必须设置）
+recognition.interimResults = false; // 不返回临时结果
+recognition.maxAlternatives = 1;   // 只返回1个识别结果
+recognition.lang = currentLang;    // 动态语言设置（重要！）
 
 recognition.onresult = (event) => {
   clearTimeout(conversationTimeout);
@@ -76,9 +79,17 @@ recognition.onresult = (event) => {
   resetConversationTimeout();
 };
 
+// 在主识别器中添加状态跟踪
+recognition.onstart = () => {
+  console.log('[主识别器] 开始工作');
+  isAwake = true;
+};
+
 recognition.onend = () => {
+  console.log('[主识别器] 结束工作');
   if (isAwake) {
-    speak(currentLang === 'zh-CN' ? "等待下一个指令" : "Waiting for next command").then(() => {
+    // speak(currentLang === 'zh-CN' ? "等待下一个指令" : "Waiting for next command").then(() => {
+      speak("").then(() => {
       isAwake = false;
       updateStatus("💤 Sleep");
       wakeRecognition.start();
@@ -87,7 +98,8 @@ recognition.onend = () => {
 };
 
 recognition.onerror = (event) => {
-  console.warn('Recognition error:', event.error);
+  // console.warn('Recognition error:', event.error);
+  console.error('[主识别器] 错误:', event.error);
   resultSpan.textContent = '识别出错/Error: ' + event.error;
   if (event.error === 'no-speech') {
     speak(currentLang === 'zh-CN' ? "没有检测到语音" : "No speech detected");
@@ -120,11 +132,64 @@ document.getElementById('langSwitch').onclick = () => {
   alert("当前语言已切换为：" + currentLang);
 };
 
-document.getElementById('startBtn').onclick = () => {
-  if (wakeRecognition) wakeRecognition.stop();
-  // wakeRecognition.continuous = false; // Stop continuous listening
-  updateStatus("🟢 Awake (manual)");
-  recognition.start();
+// document.getElementById('startBtn').onclick = () => {
+//   if (wakeRecognition) wakeRecognition.stop();
+//   // wakeRecognition.continuous = false; // Stop continuous listening
+//   updateStatus("🟢 Awake (manual)");
+//   recognition.start();
+// };
+
+// 修改按钮点击事件处理
+document.getElementById('startBtn').onclick = async () => {
+  
+  try {
+    // 停止所有正在进行的识别
+    window.speechSynthesis.cancel();
+    if (wakeRecognition) {
+      wakeRecognition.stop();
+      await new Promise(resolve => setTimeout(resolve, 3000)); // 等待3s确保完全停止
+    }
+    if (recognition) {
+      recognition.stop();
+    }
+
+    // 初始化识别器状态
+    recognition.continuous = false;
+    recognition.lang = currentLang;
+
+    // 设置短延时保证识别器完全停止
+    await new Promise(resolve => setTimeout(resolve, 50));
+    // 初始化状态
+    isAwake = true;
+    updateStatus("🟢 Awake (manual)");
+    
+    // 启动主识别器
+    console.log('[手动模式] 启动语音识别');
+    recognition.start();
+    
+    // 优化超时检测机制
+    const timeoutId = setTimeout(() => {
+      if (isAwake) {
+        console.log('[手动模式] 主动结束识别');
+        recognition.stop();
+        updateStatus("💤 Sleep");
+      }
+    }, 5000); // 5秒无输入自动停止
+
+    // 添加识别结束清理
+    recognition.onend = () => {
+      clearTimeout(timeoutId);
+      if (isAwake) {
+        console.log('[手动模式] 正常结束');
+        isAwake = false;
+        wakeRecognition.start();
+      }
+    };
+    
+  } catch (error) {
+    console.error('手动启动失败:', error);
+    speak(currentLang === 'zh-CN' ? "启动失败，请重试" : "Start failed, please try again");
+  }
 };
 
 document.getElementById('toggleHelpBtn').onclick = () => {
@@ -183,9 +248,9 @@ function matchCommand(input) {
   }
 
   if (!matched && isAwake) {
-    const response = currentLang === 'zh-CN' 
-      ? `没有找到「${input}」相关指令` 
-      : `No command found for "${input}"`;
+    // const response = currentLang === 'zh-CN' 
+    //   ? `没有找到「${input}」相关指令` 
+    //   : `No command found for "${input}"`;
     speak(response);
   }
 }
@@ -223,6 +288,8 @@ function runAction(cmd) {
 // 🔊 Speak function
 function speak(text) {
   return new Promise(resolve => {
+    // 停止当前正在播放的语音
+    window.speechSynthesis.cancel();
     const msg = new SpeechSynthesisUtterance(text);
     msg.lang = currentLang;
     const selectedVoice = voices.find(v => v.lang === currentLang);
