@@ -47,12 +47,12 @@ Just open `index.html` in a modern browser (preferably Chrome).
 ---
 
 ## 📂 Project Structure
-voice-command-demo/ <br />
-  ├── index.html # Main page <br />
-  ├── script.js # Speech logic <br />
-  ├── commands.json # External command list <br />
-  ├── README.md <br />
-  └── .gitignore <br />
+voice-command-demo/ 
+  ├── index.html # Main page 
+  ├── script.js # Speech logic 
+  ├── commands.json # External command list 
+  ├── README.md 
+  └── .gitignore
 
 ---
 
